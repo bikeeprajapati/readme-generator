@@ -1,0 +1,21 @@
+# Web framework
+fastapi==0.104.1
+uvicorn==0.24.0
+
+# Data validation
+pydantic==2.5.0
+python-multipart==0.0.6
+
+# LangChain core
+langchain==0.1.16
+langchain-community==0.0.33
+
+# LLM provider (choose one)
+langchain-openai==0.0.8
+openai==1.10.0
+
+# GitHub repo handling
+gitpython==3.1.40
+
+# Environment variables
+python-dotenv==1.0.0
