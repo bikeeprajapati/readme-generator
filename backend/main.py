@@ -1,18 +1,38 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from backend.api.routes import router
 from backend.config.settings import settings
 
 # Validate settings on startup
-settings.validate()
+settings.validate_settings()
 
-# Initialize FastAPI app
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
+    # Startup
+    print("\n" + "="*60)
+    print(" README Generator API Started!")
+    print("="*60)
+    print(f" Model: {settings.huggingface_model}")
+    print(f" Host: {settings.api_host}:{settings.api_port}")
+    print(f" Docs: http://{settings.api_host}:{settings.api_port}/docs")
+    print(f" Debug Mode: {settings.debug}")
+    print("="*60 + "\n")
+    
+    yield
+    
+    # Shutdown
+    print("\n Shutting down README Generator API...")
+
+# Initialize FastAPI app with lifespan
 app = FastAPI(
     title="README Generator API",
     description="Generate professional README.md files using HuggingFace + LangChain",
-    version="1.0.0",
+    version="2.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # CORS middleware
@@ -27,29 +47,11 @@ app.add_middleware(
 # Include API routes
 app.include_router(router)
 
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Print startup information"""
-    print("\n" + "="*60)
-    print("🚀 README Generator API Started!")
-    print("="*60)
-    print(f"📝 Model: {settings.HUGGINGFACE_MODEL}")
-    print(f"🌐 Host: {settings.API_HOST}:{settings.API_PORT}")
-    print(f"📚 Docs: http://{settings.API_HOST}:{settings.API_PORT}/docs")
-    print("="*60 + "\n")
-
-# Shutdown event
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    print("\n👋 Shutting down README Generator API...")
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "backend.main:app",
-        host=settings.API_HOST,
-        port=settings.API_PORT,
-        reload=settings.DEBUG
+        host=settings.api_host,
+        port=settings.api_port,
+        reload=settings.debug
     )
