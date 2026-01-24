@@ -43,15 +43,15 @@ class AnalysisService:
         
         # Step 4: Analyze priority files
         file_analyses = self._analyze_files(repo_path)
-        print(f"Analyzed {len(file_analyses)} files")
+        print(f"Analyzed files")
         
         # Step 5: Create semantic context
         semantic_context = self._create_semantic_context(repo_path)
-        print(f"Semantic context created")
+        print(f" Semantic context created")
         
         # Step 6: Detect technologies
         technologies = self._detect_technologies(file_analyses, deps_text)
-        print(f"Technologies detected: {technologies}")
+        print(f" Technologies detected: {technologies}")
         
         return {
             "file_structure": file_structure,
@@ -60,7 +60,7 @@ class AnalysisService:
             "file_analyses": file_analyses,
             "semantic_context": semantic_context,
             "technologies": technologies,
-            "files_analyzed_count": len(file_analyses)
+            "files_analyzed_count": len(file_analyses.split("### 📄")) - 1
         }
     
     def _analyze_files(self, repo_path: str) -> str:
@@ -76,8 +76,12 @@ class AnalysisService:
         priority_files = get_priority_files(repo_path)
         analyses = []
         
-        for file_path, file_name in priority_files[:settings.MAX_FILES_TO_ANALYZE]:
-            content = read_file_safe(file_path, max_chars=settings.MAX_FILE_SIZE)
+        # Use lowercase settings attributes (Pydantic v2)
+        max_files = settings.max_files_to_analyze
+        max_size = settings.max_file_size
+        
+        for file_path, file_name in priority_files[:max_files]:
+            content = read_file_safe(file_path, max_chars=max_size)
             
             if content and not content.startswith("[Error"):
                 analysis = self.langchain_service.analyze_file(file_name, content)
