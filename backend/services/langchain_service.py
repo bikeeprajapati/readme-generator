@@ -12,28 +12,23 @@ from backend.utils.prompt_templates import (
     tech_detection_prompt,
 )
 
-warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 class LangChainService:
-    """
-    LangChain service using Hugging Face Router API
-    (STABLE + COMPATIBLE with langchain-huggingface 0.1.x)
-    """
+    """LangChain service using HuggingFace Router (stable)"""
 
     def __init__(self):
-        self.llm = self._initialize_llm()
+        self.llm = self._init_llm()
         self.file_analysis_chain = file_analysis_prompt | self.llm
         self.tech_detection_chain = tech_detection_prompt | self.llm
 
     # --------------------------------------------------
-    # LLM Initialization (CORRECT)
+    # LLM (CORRECT + STABLE)
     # --------------------------------------------------
-    def _initialize_llm(self) -> HuggingFaceEndpoint:
-        try:
-            if not settings.huggingface_api_token:
-                raise RuntimeError("HUGGINGFACE_API_TOKEN not set")
 
+    def _init_llm(self) -> HuggingFaceEndpoint:
+        try:
             llm = HuggingFaceEndpoint(
                 repo_id=settings.huggingface_model,
                 huggingfacehub_api_token=settings.huggingface_api_token,
@@ -41,13 +36,9 @@ class LangChainService:
                 max_new_tokens=settings.max_tokens,
                 top_p=settings.top_p,
                 timeout=settings.timeout,
-                model_kwargs={
-                    # ✅ THIS is the critical fix
-                    "base_url": "https://router.huggingface.co"
-                },
             )
 
-            print(f"✅ HuggingFace Router LLM initialized: {settings.huggingface_model}")
+            print(f"✅ HuggingFace Router LLM ready: {settings.huggingface_model}")
             return llm
 
         except Exception as e:
@@ -56,8 +47,9 @@ class LangChainService:
     # --------------------------------------------------
     # Helpers
     # --------------------------------------------------
+
     @staticmethod
-    def _normalize_response(result) -> str:
+    def _normalize(result) -> str:
         if isinstance(result, str):
             return result
         if hasattr(result, "content"):
@@ -67,6 +59,7 @@ class LangChainService:
     # --------------------------------------------------
     # Core Operations
     # --------------------------------------------------
+
     def analyze_file(self, file_name: str, file_content: str) -> str:
         try:
             result = self.file_analysis_chain.invoke(
@@ -75,7 +68,7 @@ class LangChainService:
                     "file_content": file_content[:2000],
                 }
             )
-            return self._normalize_response(result)
+            return self._normalize(result)
         except Exception as e:
             return f"[Analysis failed: {e}]"
 
@@ -87,7 +80,7 @@ class LangChainService:
                     "dependencies": dependencies[:1000],
                 }
             )
-            return self._normalize_response(result).strip()
+            return self._normalize(result).strip()
         except Exception as e:
             print(f"⚠️ Technology detection failed: {e}")
             return "Unknown"
@@ -109,10 +102,10 @@ class LangChainService:
                     "file_structure": file_structure[:1000],
                     "semantic_context": semantic_context[:1000],
                 }
-            )
+            ).to_string()
 
-            response = self.llm.invoke(prompt.to_string())
-            return self._normalize_response(response)
+            response = self.llm.invoke(prompt)
+            return self._normalize(response)
 
         except Exception as e:
             raise RuntimeError(f"Failed to generate README: {e}")
@@ -120,6 +113,7 @@ class LangChainService:
     # --------------------------------------------------
     # Utilities
     # --------------------------------------------------
+
     def split_documents(self, documents: List[Document]) -> List[Document]:
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
@@ -134,6 +128,6 @@ class LangChainService:
         self, files: List[Tuple[str, str]]
     ) -> List[str]:
         return [
-            self.analyze_file(name, content)
-            for name, content in files
+            self.analyze_file(file_name, file_content)
+            for file_name, file_content in files
         ]
