@@ -4,26 +4,29 @@ from contextlib import asynccontextmanager
 from backend.api.routes import router
 from backend.config.settings import settings
 
-# Validate settings on startup
-settings.validate_settings()
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
-    # Startup
+    # Startup - Validate settings here instead of on import
+    try:
+        settings.validate_settings()
+    except ValueError as e:
+        print(f"\n❌ Configuration Error: {str(e)}\n")
+        raise
+    
     print("\n" + "="*60)
-    print(" README Generator API Started!")
+    print("🚀 README Generator API Started!")
     print("="*60)
-    print(f" Model: {settings.huggingface_model}")
-    print(f" Host: {settings.api_host}:{settings.api_port}")
-    print(f" Docs: http://{settings.api_host}:{settings.api_port}/docs")
-    print(f" Debug Mode: {settings.debug}")
+    print(f"📝 Model: {settings.huggingface_model}")
+    print(f"🌐 Host: {settings.api_host}:{settings.api_port}")
+    print(f"📚 Docs: http://{settings.api_host}:{settings.api_port}/docs")
+    print(f"🔧 Debug Mode: {settings.debug}")
     print("="*60 + "\n")
     
     yield
     
     # Shutdown
-    print("\n Shutting down README Generator API...")
+    print("\n👋 Shutting down README Generator API...")
 
 # Initialize FastAPI app with lifespan
 app = FastAPI(

@@ -1,72 +1,64 @@
-from typing import Optional
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
+from typing import Optional
 
 class Settings(BaseSettings):
-    """Application settings (Pydantic v2 compatible)"""
-
+    """Application settings and configuration using Pydantic v2"""
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="ignore",
+        extra="ignore"
     )
-
-    # -------------------------
+    
     # API Settings
-    # -------------------------
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     debug: bool = True
-
-    # -------------------------
+    
     # HuggingFace Settings
-    # -------------------------
-    huggingface_api_token: Optional[str] = None
+    huggingface_api_key: str = ""
     huggingface_model: str = "mistralai/Mistral-7B-Instruct-v0.2"
-
-    # -------------------------
-    # OpenAI fallback (optional)
-    # -------------------------
+    
+    # Alternative models you can use:
+    # "mistralai/Mistral-7B-Instruct-v0.3"
+    # "meta-llama/Meta-Llama-3-8B-Instruct"
+    # "microsoft/phi-2"
+    # "google/flan-t5-xxl"
+    # "HuggingFaceH4/zephyr-7b-beta"
+    
+    # Optional: OpenAI (fallback)
     openai_api_key: Optional[str] = None
-
-    # -------------------------
+    
     # LangChain Settings
-    # -------------------------
     langchain_tracing_v2: bool = False
     langchain_api_key: Optional[str] = None
     langchain_project: str = "readme-generator"
-
-    # -------------------------
-    # Repository Limits
-    # -------------------------
+    
+    # Repository Settings
     temp_dir: str = "temp"
-    max_file_size: int = 5000
+    max_file_size: int = 5000  # characters
     max_files_to_analyze: int = 10
-
-    # -------------------------
-    # Model Parameters
-    # -------------------------
+    
+    # Model Settings
     temperature: float = 0.7
     max_tokens: int = 2048
-    top_p: float = 0.95   
-
-    # -------------------------
-    # Performance
-    # -------------------------
+    top_p: float = 0.95
+    
+    # Performance Settings
     use_cache: bool = True
-    timeout: int = 120
-
-    # -------------------------
-    # Validation
-    # -------------------------
-    def validate_settings(self) -> None:
-        if not (self.huggingface_api_token or self.openai_api_key):
+    timeout: int = 120  # seconds
+    
+    def validate_settings(self) -> bool:
+        """Validate required settings"""
+        if not self.huggingface_api_key and not self.openai_api_key:
             raise ValueError(
-                "Either HUGGINGFACE_API_TOKEN or OPENAI_API_KEY must be set"
+                "Either HUGGINGFACE_API_KEY or OPENAI_API_KEY must be set in .env file. "
+                "Please check your .env file exists and contains: HUGGINGFACE_API_KEY=hf_..."
             )
+        return True
 
-
-# Global instance
+# Create global settings instance
 settings = Settings()
-settings.validate_settings()
+
