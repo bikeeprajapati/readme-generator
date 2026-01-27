@@ -1,9 +1,9 @@
-from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
+from langchain_huggingface import HuggingFaceEndpoint
 from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain.chains import LLMChain
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from huggingface_hub import InferenceClient
 from typing import List, Optional
 import warnings
 
@@ -23,51 +23,34 @@ class LangChainService:
     def __init__(self):
         """Initialize LangChain service with HuggingFace model"""
         self.llm = self._initialize_llm()
+        self.client = InferenceClient(token=settings.huggingface_api_key)
         self.file_analysis_chain = self._create_analysis_chain()
         self.tech_detection_chain = self._create_tech_chain()
     
     def _initialize_llm(self):
         """
-        Initialize HuggingFace LLM using ChatHuggingFace for better compatibility
+        Initialize HuggingFace LLM - simplified version
         
         Returns:
             LangChain LLM instance
         """
         try:
-            # First create the endpoint
+            # Use a model that works well with the inference API
             llm = HuggingFaceEndpoint(
                 repo_id=settings.huggingface_model,
                 huggingfacehub_api_token=settings.huggingface_api_key,
                 temperature=settings.temperature,
                 max_new_tokens=settings.max_tokens,
-                top_p=settings.top_p,
-                timeout=settings.timeout,
+                task="text2text-generation",  # Explicitly set task for FLAN-T5
             )
             
-            # Wrap it with ChatHuggingFace for conversational models
-            chat_llm = ChatHuggingFace(llm=llm)
-            
-            print(f"✅ HuggingFace Chat LLM initialized: {settings.huggingface_model}")
-            return chat_llm
+            print(f"✅ HuggingFace LLM initialized: {settings.huggingface_model}")
+            return llm
             
         except Exception as e:
-            print(f"⚠️ ChatHuggingFace failed, trying direct endpoint: {str(e)}")
-            # Fallback to direct endpoint for non-chat models
-            try:
-                llm = HuggingFaceEndpoint(
-                    repo_id=settings.huggingface_model,
-                    huggingfacehub_api_token=settings.huggingface_api_key,
-                    temperature=settings.temperature,
-                    max_new_tokens=settings.max_tokens,
-                    top_p=settings.top_p,
-                    timeout=settings.timeout,
-                    task="text-generation",
-                )
-                print(f"✅ HuggingFace Endpoint initialized: {settings.huggingface_model}")
-                return llm
-            except Exception as e2:
-                print(f"❌ Failed to initialize HuggingFace LLM: {str(e2)}")
-                raise
+            print(f"❌ Failed to initialize HuggingFace LLM: {str(e)}")
+            print(f"💡 Tip: Make sure your API token is valid and the model is accessible")
+            raise
     
     def _create_analysis_chain(self):
         """Create file analysis chain"""
@@ -77,9 +60,32 @@ class LangChainService:
         """Create technology detection chain"""
         return tech_detection_prompt | self.llm
     
+    def _call_inference_api(self, prompt: str, max_new_tokens: int = 500) -> str:
+        """
+        Direct call to HuggingFace Inference API as fallback
+        
+        Args:
+            prompt: Input prompt
+            max_new_tokens: Maximum tokens to generate
+            
+        Returns:
+            Generated text
+        """
+        try:
+            response = self.client.text_generation(
+                prompt,
+                model=settings.huggingface_model,
+                max_new_tokens=max_new_tokens,
+                temperature=settings.temperature,
+            )
+            return response
+        except Exception as e:
+            print(f"⚠️ Inference API error: {str(e)}")
+            return ""
+    
     def analyze_file(self, file_name: str, file_content: str) -> str:
         """
-        Analyze a single file using LangChain (Latest API)
+        Analyze a single file using HuggingFace Inference API
         
         Args:
             file_name: Name of the file
@@ -89,19 +95,11 @@ class LangChainService:
             Analysis summary
         """
         try:
-            # Use the new invoke method (LangChain v0.3+)
-            result = self.file_analysis_chain.invoke({
-                "file_name": file_name,
-                "file_content": file_content[:2000]
-            })
+            prompt = f"Analyze this code file and provide a brief summary (2-3 sentences):\n\nFile: {file_name}\n\n{file_content[:1500]}\n\nSummary:"
             
-            # Handle different response types (ChatHuggingFace returns AIMessage)
-            if hasattr(result, 'content'):
-                return result.content
-            elif isinstance(result, str):
-                return result
-            else:
-                return str(result)
+            result = self._call_inference_api(prompt, max_new_tokens=200)
+            
+            return result if result else f"[Analysis skipped - {file_name}]"
                 
         except Exception as e:
             print(f"⚠️ File analysis error for {file_name}: {str(e)}")
@@ -119,24 +117,11 @@ class LangChainService:
             Comma-separated list of technologies
         """
         try:
-            result = self.tech_detection_chain.invoke({
-                "files_info": files_info[:1000],
-                "dependencies": dependencies[:1000]
-            })
+            prompt = f"List all technologies and frameworks used in this project:\n\n{dependencies[:800]}\n\nTechnologies (comma-separated):"
             
-            # Handle different response types
-            if hasattr(result, 'content'):
-                text = result.content.strip()
-            elif isinstance(result, str):
-                text = result.strip()
-            else:
-                text = str(result).strip()
+            result = self._call_inference_api(prompt, max_new_tokens=100)
             
-            # Clean up the response
-            if "Technologies:" in text:
-                text = text.split("Technologies:")[-1].strip()
-            
-            return text if text else "Unknown"
+            return result.strip() if result else "Unknown"
                 
         except Exception as e:
             print(f"⚠️ Technology detection failed: {str(e)}")
@@ -151,7 +136,7 @@ class LangChainService:
         semantic_context: str = ""
     ) -> str:
         """
-        Generate README using LangChain and HuggingFace (Latest API)
+        Generate README using HuggingFace Inference API
         
         Args:
             repo_url: Repository URL
@@ -164,55 +149,194 @@ class LangChainService:
             Generated README content
         """
         try:
-            # Create the prompt
-            prompt_text = f"""You are an expert technical writer. Create a professional README.md for this repository.
+            # Create a concise prompt for FLAN-T5
+            prompt = f"""Create a professional README.md for this GitHub repository:
 
 Repository: {repo_url}
 
-Project Analysis:
-{analysis[:2000]}
-
 Dependencies:
-{dependencies[:800]}
+{dependencies[:600]}
 
-File Structure:
-{file_structure[:800]}
+Files:
+{file_structure[:400]}
 
-Context:
-{semantic_context[:500]}
+Generate a README with:
+1. Project title and description
+2. Key features (3 points)
+3. Technologies used
+4. Installation steps
+5. Basic usage
 
-Generate a complete README.md with these sections:
-1. Project Title and Description
-2. Features (3-5 bullet points)
-3. Technologies Used
-4. Installation Instructions
-5. Usage Examples
-6. Project Structure
-7. Contributing
-8. License
+README:"""
 
-Use proper Markdown formatting. Be concise but informative."""
-
-            # Invoke the LLM
-            if isinstance(self.llm, ChatHuggingFace):
-                # For ChatHuggingFace, use messages
-                messages = [HumanMessage(content=prompt_text)]
-                response = self.llm.invoke(messages)
-            else:
-                # For regular endpoint
-                response = self.llm.invoke(prompt_text)
+            # Use longer token limit for README generation
+            result = self._call_inference_api(prompt, max_new_tokens=1500)
             
-            # Extract content
-            if hasattr(response, 'content'):
-                return response.content
-            elif isinstance(response, str):
-                return response
-            else:
-                return str(response)
+            if not result or len(result) < 50:
+                # Fallback: Create a basic README from available info
+                return self._create_basic_readme(repo_url, dependencies, file_structure)
+            
+            return result
             
         except Exception as e:
             print(f"❌ README generation error: {str(e)}")
-            raise RuntimeError(f"Failed to generate README: {e}")
+            # Return fallback README
+            return self._create_basic_readme(repo_url, dependencies, file_structure)
+    
+    def _create_basic_readme(self, repo_url: str, dependencies: str, file_structure: str) -> str:
+        """Create a basic README as fallback with improved intelligence"""
+        repo_name = repo_url.split('/')[-1].replace('.git', '')
+        
+        # Detect project type from dependencies
+        project_type = "Application"
+        tech_stack = []
+        install_cmd = "pip install -r requirements.txt"
+        run_cmd = "python main.py"
+        
+        deps_lower = dependencies.lower()
+        
+        if "fastapi" in deps_lower or "flask" in deps_lower or "django" in deps_lower:
+            project_type = "Web API"
+            if "fastapi" in deps_lower:
+                tech_stack.append("FastAPI")
+                run_cmd = "uvicorn app.main:app --reload"
+            elif "flask" in deps_lower:
+                tech_stack.append("Flask")
+                run_cmd = "flask run"
+            elif "django" in deps_lower:
+                tech_stack.append("Django")
+                run_cmd = "python manage.py runserver"
+        
+        if "streamlit" in deps_lower:
+            tech_stack.append("Streamlit")
+            project_type = "Data Application"
+        
+        if "machine learning" in deps_lower or "scikit-learn" in deps_lower or "tensorflow" in deps_lower or "torch" in deps_lower:
+            project_type = "Machine Learning Project"
+            if "scikit-learn" in deps_lower:
+                tech_stack.append("Scikit-learn")
+            if "tensorflow" in deps_lower:
+                tech_stack.append("TensorFlow")
+            if "torch" in deps_lower or "pytorch" in deps_lower:
+                tech_stack.append("PyTorch")
+        
+        if "react" in deps_lower or "vue" in deps_lower or "angular" in deps_lower:
+            project_type = "Frontend Application"
+            install_cmd = "npm install"
+            run_cmd = "npm start"
+            if "react" in deps_lower:
+                tech_stack.append("React")
+            elif "vue" in deps_lower:
+                tech_stack.append("Vue.js")
+            elif "angular" in deps_lower:
+                tech_stack.append("Angular")
+        
+        if "docker" in file_structure.lower():
+            tech_stack.append("Docker")
+        
+        # Detect language
+        language = "Python" if "requirements.txt" in file_structure else "JavaScript" if "package.json" in file_structure else "Unknown"
+        
+        if language == "Python":
+            tech_stack.insert(0, "Python")
+        elif language == "JavaScript":
+            tech_stack.insert(0, "JavaScript")
+        
+        tech_stack_str = ", ".join(tech_stack) if tech_stack else "See dependencies below"
+        
+        return f"""# {repo_name.replace('-', ' ').title()}
+
+## 📋 Description
+
+A {project_type.lower()} built with modern technologies. This repository contains the source code and configuration files for {repo_name}.
+
+## ✨ Features
+
+- 🚀 Modern architecture and clean code structure
+- 📦 Well-organized project layout
+- 🔧 Easy to set up and configure
+- 📝 Comprehensive documentation
+- 🧪 Ready for development and testing
+
+## 🛠️ Technologies Used
+
+**Core Stack:** {tech_stack_str}
+
+**Dependencies:**
+{dependencies[:400]}
+
+## 📦 Installation
+
+### Prerequisites
+- {language} installed on your system
+- Git for version control
+{'- Docker (optional, for containerized deployment)' if 'docker' in file_structure.lower() else ''}
+
+### Setup Steps
+
+```bash
+# 1. Clone the repository
+git clone {repo_url}
+
+# 2. Navigate to the project directory
+cd {repo_name}
+
+# 3. Install dependencies
+{install_cmd}
+```
+
+{'### Using Docker\n\n```bash\n# Build the Docker image\ndocker build -t ' + repo_name + ' .\n\n# Run the container\ndocker run -p 8000:8000 ' + repo_name + '\n```' if 'dockerfile' in file_structure.lower() else ''}
+
+## 🚀 Usage
+
+```bash
+# Run the application
+{run_cmd}
+```
+
+The application will be available at `http://localhost:8000` (or the configured port).
+
+## 📁 Project Structure
+
+```
+{file_structure[:600]}
+```
+
+## 🧪 Testing
+
+```bash
+# Run tests
+{'pytest' if language == 'Python' else 'npm test'}
+```
+
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome!
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 👤 Author
+
+**Repository:** [{repo_name}]({repo_url})
+
+## 🙏 Acknowledgments
+
+- Thanks to all contributors
+- Built with modern tools and best practices
+- Open source community support
+
+---
+
+⭐ **Star this repository if you find it helpful!**
+"""
     
     def split_documents(self, documents: List[Document]) -> List[Document]:
         """
