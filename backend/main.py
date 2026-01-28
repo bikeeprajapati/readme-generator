@@ -11,22 +11,22 @@ async def lifespan(app: FastAPI):
     try:
         settings.validate_settings()
     except ValueError as e:
-        print(f"\n❌ Configuration Error: {str(e)}\n")
+        print(f"\nConfiguration Error: {str(e)}\n")
         raise
     
     print("\n" + "="*60)
-    print("🚀 README Generator API Started!")
+    print("README Generator API Started!")
     print("="*60)
-    print(f"📝 Model: {settings.huggingface_model}")
-    print(f"🌐 Host: {settings.api_host}:{settings.api_port}")
-    print(f"📚 Docs: http://{settings.api_host}:{settings.api_port}/docs")
-    print(f"🔧 Debug Mode: {settings.debug}")
+    print(f" Model: {settings.huggingface_model}")
+    print(f"Host: {settings.api_host}:{settings.api_port}")
+    print(f" Docs: http://{settings.api_host}:{settings.api_port}/docs")
+    print(f" Debug Mode: {settings.debug}")
     print("="*60 + "\n")
     
     yield
     
     # Shutdown
-    print("\n👋 Shutting down README Generator API...")
+    print("\n Shutting down README Generator API...")
 
 # Initialize FastAPI app with lifespan
 app = FastAPI(

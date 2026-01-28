@@ -21,12 +21,6 @@ class Settings(BaseSettings):
     huggingface_api_key: str = ""
     huggingface_model: str = "mistralai/Mistral-7B-Instruct-v0.2"
     
-    # Alternative models you can use:
-    # "mistralai/Mistral-7B-Instruct-v0.3"
-    # "meta-llama/Meta-Llama-3-8B-Instruct"
-    # "microsoft/phi-2"
-    # "google/flan-t5-xxl"
-    # "HuggingFaceH4/zephyr-7b-beta"
     
     # Optional: OpenAI (fallback)
     openai_api_key: Optional[str] = None
@@ -48,7 +42,7 @@ class Settings(BaseSettings):
     
     # Performance Settings
     use_cache: bool = True
-    timeout: int = 120  # seconds
+    timeout: int = 120  
     
     def validate_settings(self) -> bool:
         """Validate required settings"""

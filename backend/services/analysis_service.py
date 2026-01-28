@@ -60,7 +60,7 @@ class AnalysisService:
             "file_analyses": file_analyses,
             "semantic_context": semantic_context,
             "technologies": technologies,
-            "files_analyzed_count": len(file_analyses.split("### 📄")) - 1
+            "files_analyzed_count": len(file_analyses.split("### ")) - 1
         }
     
     def _analyze_files(self, repo_path: str) -> str:

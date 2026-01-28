@@ -44,12 +44,12 @@ class LangChainService:
                 task="text2text-generation",  # Explicitly set task for FLAN-T5
             )
             
-            print(f"✅ HuggingFace LLM initialized: {settings.huggingface_model}")
+            print(f" HuggingFace LLM initialized: {settings.huggingface_model}")
             return llm
             
         except Exception as e:
-            print(f"❌ Failed to initialize HuggingFace LLM: {str(e)}")
-            print(f"💡 Tip: Make sure your API token is valid and the model is accessible")
+            print(f" Failed to initialize HuggingFace LLM: {str(e)}")
+            print(f" Tip: Make sure your API token is valid and the model is accessible")
             raise
     
     def _create_analysis_chain(self):
@@ -80,7 +80,7 @@ class LangChainService:
             )
             return response
         except Exception as e:
-            print(f"⚠️ Inference API error: {str(e)}")
+            print(f" Inference API error: {str(e)}")
             return ""
     
     def analyze_file(self, file_name: str, file_content: str) -> str:
@@ -102,7 +102,7 @@ class LangChainService:
             return result if result else f"[Analysis skipped - {file_name}]"
                 
         except Exception as e:
-            print(f"⚠️ File analysis error for {file_name}: {str(e)}")
+            print(f" File analysis error for {file_name}: {str(e)}")
             return f"[Analysis skipped - {file_name}]"
     
     def detect_technologies(self, files_info: str, dependencies: str) -> str:
@@ -124,7 +124,7 @@ class LangChainService:
             return result.strip() if result else "Unknown"
                 
         except Exception as e:
-            print(f"⚠️ Technology detection failed: {str(e)}")
+            print(f" Technology detection failed: {str(e)}")
             return "Unknown"
     
     def generate_readme(
@@ -179,7 +179,7 @@ README:"""
             return result
             
         except Exception as e:
-            print(f"❌ README generation error: {str(e)}")
+            print(f"README generation error: {str(e)}")
             # Return fallback README
             return self._create_basic_readme(repo_url, dependencies, file_structure)
     
